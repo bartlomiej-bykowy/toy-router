@@ -58,7 +58,12 @@ export class Router {
   }
 
   #bindEvents(): void {
-    // TODO: add popstate listiner and click listeners for links
+    window.addEventListener("popstate", this.#renderView);
+    document.addEventListener("click", (e) => this.#handleLinkClick(e));
+  }
+
+  #handleLinkClick(e: PointerEvent): void {
+    // TODO: here we'll handle link click
   }
 
   #renderView(): void {
