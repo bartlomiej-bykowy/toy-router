@@ -12,7 +12,7 @@ export class Router {
 
     this.routes = routes;
     this.root = root;
-    this.rootEl = this.#setRootEl();
+    this.rootEl = this.#setRootElement();
 
     this.#bindEvents();
     this.#renderView();
@@ -47,8 +47,14 @@ export class Router {
     }
   }
 
-  #setRootEl(): HTMLElement {
-    // TODO: set the root element
+  #setRootElement(): HTMLElement {
+    const el = document.querySelector(this.root) as HTMLElement;
+
+    if (!el) {
+      throw new Error(`Element ${this.root} not found.`);
+    }
+
+    return el;
   }
 
   #bindEvents(): void {
