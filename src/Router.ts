@@ -5,7 +5,7 @@ export class Router {
   root: string;
   rootEl: HTMLElement;
 
-  static #numOfInstances = 0;
+  static #routerInstances = 0;
 
   constructor(routes: Route[], root: string) {
     this.#singletonGuard();
@@ -39,7 +39,12 @@ export class Router {
   // ------------- PRIVATE METHODS ------------- //
 
   #singletonGuard(): void {
-    // TODO: implement guard
+    if (Router.#routerInstances > 0) {
+      // There is already instace of Router
+      throw new Error("Router already initialized.");
+    } else {
+      Router.#routerInstances++;
+    }
   }
 
   #setRootEl(): HTMLElement {
