@@ -10,7 +10,7 @@ export class Router {
   constructor(routes: Route[], root: string) {
     this.#singletonGuard();
 
-    this.routes = routes;
+    this.routes = this.#loadRoutes(routes);
     this.root = root;
     this.rootEl = this.#setRootElement();
 
@@ -45,6 +45,18 @@ export class Router {
     } else {
       Router.#routerInstances++;
     }
+  }
+
+  #loadRoutes(routes: Route[]): Route[] {
+    const isCatchAllRoute = routes.find((route) => route.path === "*");
+    if (isCatchAllRoute) return routes;
+
+    const catchAllRoute: Route = {
+      path: "*",
+      view: "<h1>404 Page Not Foud</h1>",
+    };
+
+    return [...routes, catchAllRoute];
   }
 
   #setRootElement(): HTMLElement {
