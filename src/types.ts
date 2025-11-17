@@ -1,13 +1,29 @@
+export type HtmlStringView = string;
+export type WebComponentView = string;
+export type HtmlElementView = HTMLElement;
+export type LazyView = () => Promise<any>;
+
+export type ViewTypes =
+  | HtmlStringView
+  | WebComponentView
+  | HtmlElementView
+  | LazyView;
+
 export type Route = {
   path: string;
-  view: string | (() => Promise<any>);
+  view: ViewTypes;
   beforeEnter?: (ctx: RouteContext) => boolean | Promise<boolean>;
 };
 
 export type RouteContext = {
   url: URL;
   pathname: string;
-  parmas: Record<string, string>;
-  query: Record<string, string>;
-  hash: string;
+  params: Record<string, string> | null;
+  query: Record<string, string> | null;
+  hash: string | null;
+};
+
+export type MatchResult = {
+  route: Route;
+  params: Record<string, string>;
 };

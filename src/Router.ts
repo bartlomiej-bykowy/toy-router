@@ -1,4 +1,4 @@
-import type { Route } from "./types";
+import type { MatchResult, Route } from "./types";
 
 export class Router {
   routes: Route[];
@@ -82,8 +82,42 @@ export class Router {
     // TODO: render view for current route, use matchRoute
   }
 
-  #matchRoute(pathname: string): Route | null {
-    // TODO: match route against current path, use it in renderView
-    return null;
+  #matchRoute(pathname: string): MatchResult {
+    const regexp = /^\/|\/$/g;
+    const pathArr = pathname.replace(regexp, "").split("/");
+
+    let matchRoute: MatchResult = {
+      route: this.routes.find((route) => route.path === "*")!,
+      params: {},
+    };
+
+    for (const route of this.routes) {
+      const routeArr = route.path.replace(regexp, "").split("/");
+
+      if (routeArr.length === pathArr.length) {
+        let params: MatchResult["params"] = {};
+        let routeFound = true;
+
+        for (const idx in routeArr) {
+          const routeSegment = routeArr[idx];
+          const pathSegment = pathArr[idx];
+
+          if (routeSegment.startsWith(":")) {
+            params[routeSegment.slice(1)] = pathSegment;
+          } else if (routeSegment !== pathSegment) {
+            routeFound = false;
+            break;
+          }
+        }
+
+        if (routeFound) {
+          matchRoute.route = route;
+          matchRoute.params = params;
+          break;
+        }
+      }
+    }
+
+    return matchRoute;
   }
 }
