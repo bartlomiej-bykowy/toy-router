@@ -1,9 +1,9 @@
-import type { MatchResult, Route } from "./types";
+import type { MatchResult, Route, RouteContext, ViewTypes } from "./types";
 
 export class Router {
   routes: Route[];
   root: string;
-  rootEl: HTMLElement;
+  rootElement: HTMLElement;
 
   static #routerInstances = 0;
 
@@ -12,10 +12,10 @@ export class Router {
 
     this.routes = this.#loadRoutes(routes);
     this.root = root;
-    this.rootEl = this.#setRootElement();
+    this.rootElement = this.#setRootElement();
 
     this.#bindEvents();
-    this.#renderView();
+    this.#renderRoute();
   }
 
   // ------------- PUBLIC METHODS ------------- //
@@ -25,7 +25,7 @@ export class Router {
   }
 
   url(): URL {
-    // TODO: acts as wrapper for new URL and returns current path info
+    return new URL(window.location.href);
   }
 
   params(): void {
@@ -70,16 +70,12 @@ export class Router {
   }
 
   #bindEvents(): void {
-    window.addEventListener("popstate", this.#renderView);
+    window.addEventListener("popstate", this.#renderRoute);
     document.addEventListener("click", (e) => this.#handleLinkClick(e));
   }
 
   #handleLinkClick(e: PointerEvent): void {
     // TODO: here we'll handle link click
-  }
-
-  #renderView(): void {
-    // TODO: render view for current route, use matchRoute
   }
 
   #matchRoute(pathname: string): MatchResult {
@@ -119,5 +115,114 @@ export class Router {
     }
 
     return matchRoute;
+  }
+
+  async #renderRoute(): Promise<any> {
+    const pathname = window.location.pathname;
+    const matchedRoute = this.#matchRoute(pathname);
+    const routeContext = this.#createRouteContext(matchedRoute);
+
+    const canEnterRoute =
+      (await matchedRoute.route.beforeEnter?.(routeContext)) ?? true;
+
+    if (!canEnterRoute) return;
+
+    await this.#renderRouteView(matchedRoute.route);
+    // reset scroll position
+    window.scrollTo(0, 0);
+  }
+
+  #createRouteContext(matchedRoute: MatchResult): RouteContext {
+    const url = this.url();
+    const { pathname, search, hash } = url;
+    const query = search.replace("?", "");
+    // turn ?id=1&sort=asc into {id: 1, sort: "asc"}
+    const queryObj = query.length
+      ? query.split("&").reduce<Record<string, string>>((obj, val) => {
+          const [rawKey, rawValue = ""] = val.split("=");
+          const key = decodeURIComponent(rawKey);
+          const value = decodeURIComponent(rawValue);
+          obj[key] = value;
+          return obj;
+        }, {})
+      : {};
+
+    const routeContext: RouteContext = {
+      url,
+      pathname,
+      params: matchedRoute.params,
+      query: queryObj,
+      hash: hash.replace("#", ""),
+    };
+
+    return routeContext;
+  }
+
+  async #renderRouteView(route: Route): Promise<void> {
+    const { view } = route;
+
+    if (!view) {
+      throw new Error(`View for the route ${route.path} is missing.`);
+    }
+
+    const { viewType, view: viewElement } = await this.#validateView(view);
+
+    if (viewType === "string") {
+      this.rootElement.replaceChildren();
+      this.rootElement.innerHTML = viewElement as string;
+    }
+    if (viewType === "web-component") {
+      const element = document.createElement(viewElement as string);
+      this.rootElement.replaceChildren(element);
+    }
+    if (viewType === "html-element") {
+      this.rootElement.replaceChildren(viewElement as HTMLElement);
+    }
+  }
+
+  async #validateView(view: ViewTypes): Promise<{
+    viewType: "string" | "web-component" | "html-element";
+    view: ViewTypes;
+  }> {
+    if (typeof view === "string") {
+      const trimmed = view.trim();
+      // string
+      if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
+        return {
+          viewType: "string",
+          view: trimmed,
+        };
+      }
+      // web component
+      const regexp = /^[a-z0-9]+(-[a-z0-9]+)+$/;
+      if (regexp.test(trimmed)) {
+        return {
+          viewType: "web-component",
+          view: trimmed,
+        };
+      }
+    }
+    // html element
+    if (view instanceof HTMLElement) {
+      return {
+        viewType: "html-element",
+        view,
+      };
+    }
+    // lazy loaded element
+    if (typeof view === "function") {
+      const viewPromise = view();
+      if (viewPromise instanceof Promise) {
+        const resolvedViewPromise = await viewPromise;
+        if (resolvedViewPromise.default) {
+          return this.#validateView(resolvedViewPromise.default);
+        }
+        return this.#validateView(resolvedViewPromise);
+      }
+    }
+    // other type
+    throw new Error(
+      "Unrecognized view format. View should be a string, name of a web component, html element or promise resolving to one of these types."
+    );
   }
 }
