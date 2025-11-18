@@ -71,11 +71,56 @@ export class Router {
 
   #bindEvents(): void {
     window.addEventListener("popstate", this.#renderRoute);
-    document.addEventListener("click", (e) => this.#handleLinkClick(e));
+    document.addEventListener("click", this.#handleLinkClick.bind(this));
   }
 
-  #handleLinkClick(e: PointerEvent): void {
-    // TODO: here we'll handle link click
+  #handleLinkClick(event: PointerEvent): void {
+    // ignore if click with modifier
+    const { defaultPrevented, metaKey, ctrlKey, shiftKey, altKey, button } =
+      event;
+    if (defaultPrevented) return;
+    if (metaKey || ctrlKey || shiftKey || altKey) return;
+    // not left button
+    if (button !== 0) return;
+
+    // we need to get full click path because of web components
+    const clickPath = event.composedPath() as HTMLElement[];
+    const anchor = clickPath.find((el) => el instanceof HTMLAnchorElement);
+
+    if (!anchor) return;
+
+    let href = anchor.getAttribute("href");
+    const targetBlank = anchor.getAttribute("target") === "_blank";
+    const isDownload = anchor.hasAttribute("download");
+    const isExternal = anchor.getAttribute("rel") === "external";
+
+    if (!href || targetBlank || isDownload || isExternal) return;
+    // is anchor link
+    if (href.startsWith("#")) return;
+
+    const forbiddenProtocols = [
+      "http://",
+      "https://",
+      "mailto:",
+      "tel:",
+      "sms:",
+      "ftp:",
+      "javascript:",
+      "blob:",
+      "file:",
+      "data:",
+    ];
+    const hasForbiddenProtocol = forbiddenProtocols.some((protocol) =>
+      href!.toLowerCase().startsWith(protocol)
+    );
+
+    if (hasForbiddenProtocol) return;
+
+    if (!href.startsWith("/")) href = "/" + href;
+
+    // prevent default if all criteria are met
+    event.preventDefault();
+    this.navigate(href);
   }
 
   #matchRoute(pathname: string): MatchResult {
