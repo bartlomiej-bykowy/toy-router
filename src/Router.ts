@@ -1,4 +1,10 @@
-import type { MatchResult, Route, RouteContext, ViewTypes } from "./types";
+import type {
+  MatchResult,
+  OnRouteChangeCallback,
+  Route,
+  RouteContext,
+  ViewTypes,
+} from "./types";
 
 export class Router {
   routes: Route[];
@@ -6,6 +12,9 @@ export class Router {
   rootElement: HTMLElement;
 
   static #routerInstances = 0;
+  static #currentRouteContext: RouteContext;
+  static #currentRoute: MatchResult;
+  static #routeChangeCallbacks: OnRouteChangeCallback[] = [];
 
   constructor(routes: Route[], root: string) {
     this.#singletonGuard();
@@ -21,19 +30,47 @@ export class Router {
   // ------------- PUBLIC METHODS ------------- //
 
   navigate(path: string): void {
-    // TODO: will navigate to specified path and render nee view
+    const normalizedPath = this.#normalizeUrl(path);
+    history.pushState({}, "", normalizedPath);
+    this.#renderRoute();
+  }
+
+  redirect(path: string): void {
+    const normalizedPath = this.#normalizeUrl(path);
+    history.replaceState({}, "", normalizedPath);
+    this.#renderRoute();
   }
 
   url(): URL {
-    return new URL(window.location.href);
+    return Router.#currentRouteContext.url;
   }
 
-  params(): void {
-    // TODO: returns object with path params: path, query, hash
+  params() {
+    const { params, query, hash } = Router.#currentRouteContext;
+
+    return {
+      pathParams: params,
+      query,
+      hash,
+    };
   }
 
-  redirect(): void {
-    // TODO: redirect - similar to navigate but don't alter state of history
+  currentRoute(): Route {
+    return Router.#currentRoute.route;
+  }
+
+  onRouteChange(cb: OnRouteChangeCallback): () => void {
+    if (typeof cb !== "function") {
+      throw new Error("onRouteChange callback must be a function.");
+    }
+
+    Router.#routeChangeCallbacks.push(cb);
+
+    return () => {
+      Router.#routeChangeCallbacks = Router.#routeChangeCallbacks.filter(
+        (callback) => callback !== cb
+      );
+    };
   }
 
   // ------------- PRIVATE METHODS ------------- //
@@ -116,7 +153,7 @@ export class Router {
 
     if (hasForbiddenProtocol) return;
 
-    if (!href.startsWith("/")) href = "/" + href;
+    href = this.#normalizeUrl(href);
 
     // prevent default if all criteria are met
     event.preventDefault();
@@ -164,21 +201,26 @@ export class Router {
 
   async #renderRoute(): Promise<any> {
     const pathname = window.location.pathname;
-    const matchedRoute = this.#matchRoute(pathname);
-    const routeContext = this.#createRouteContext(matchedRoute);
+    Router.#currentRoute = this.#matchRoute(pathname);
+    Router.#currentRouteContext = this.#createRouteContext(
+      Router.#currentRoute
+    );
 
     const canEnterRoute =
-      (await matchedRoute.route.beforeEnter?.(routeContext)) ?? true;
+      (await Router.#currentRoute.route.beforeEnter?.(
+        Router.#currentRouteContext
+      )) ?? true;
 
     if (!canEnterRoute) return;
 
-    await this.#renderRouteView(matchedRoute.route);
+    await this.#renderRouteView(Router.#currentRoute.route);
+    this.#callRouteChangeCallbacks();
     // reset scroll position
     window.scrollTo(0, 0);
   }
 
   #createRouteContext(matchedRoute: MatchResult): RouteContext {
-    const url = this.url();
+    const url = new URL(window.location.href);
     const { pathname, search, hash } = url;
     const query = search.replace("?", "");
     // turn ?id=1&sort=asc into {id: 1, sort: "asc"}
@@ -269,5 +311,19 @@ export class Router {
     throw new Error(
       "Unrecognized view format. View should be a string, name of a web component, html element or promise resolving to one of these types."
     );
+  }
+
+  #normalizeUrl(url: string): string {
+    return url.startsWith("/") ? url : "/" + url;
+  }
+
+  #callRouteChangeCallbacks(): void {
+    Router.#routeChangeCallbacks.forEach((callback) => {
+      try {
+        callback(Router.#currentRouteContext);
+      } catch (error) {
+        console.error("RouteChange callback error: ", error);
+      }
+    });
   }
 }

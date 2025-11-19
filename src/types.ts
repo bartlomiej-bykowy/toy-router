@@ -27,3 +27,5 @@ export type MatchResult = {
   route: Route;
   params: Record<string, string>;
 };
+
+export type OnRouteChangeCallback = (ctx: RouteContext) => void;
