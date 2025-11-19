@@ -70,7 +70,7 @@ export class Router {
   }
 
   #bindEvents(): void {
-    window.addEventListener("popstate", this.#renderRoute);
+    window.addEventListener("popstate", this.#renderRoute.bind(this));
     document.addEventListener("click", this.#handleLinkClick.bind(this));
   }
 
