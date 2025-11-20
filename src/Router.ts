@@ -16,8 +16,10 @@ export class Router {
   static #currentRoute: MatchResult;
   static #routeChangeCallbacks: OnRouteChangeCallback[] = [];
   static #scrollPositions: Map<string, number> = new Map();
+  static #isDevMode: boolean;
 
-  constructor(routes: Route[], root: string) {
+  constructor(routes: Route[], root: string, devMode?: boolean) {
+    this.#setDevFlag(devMode);
     this.#singletonGuard();
 
     this.routes = this.#loadRoutes(routes);
@@ -66,7 +68,9 @@ export class Router {
 
   onRouteChange(cb: OnRouteChangeCallback): () => void {
     if (typeof cb !== "function") {
-      throw new Error("onRouteChange callback must be a function.");
+      this.#renderError(
+        new Error("onRouteChange callback must be a function.")
+      );
     }
 
     Router.#routeChangeCallbacks.push(cb);
@@ -83,7 +87,7 @@ export class Router {
   #singletonGuard(): void {
     if (Router.#routerInstances > 0) {
       // There is already instace of Router
-      throw new Error("Router already initialized.");
+      this.#renderError(new Error("Router already initialized."));
     } else {
       Router.#routerInstances++;
     }
@@ -105,7 +109,7 @@ export class Router {
     const el = document.querySelector(this.root) as HTMLElement;
 
     if (!el) {
-      throw new Error(`Element ${this.root} not found.`);
+      this.#renderError(new Error(`Element ${this.root} not found.`));
     }
 
     return el;
@@ -219,8 +223,18 @@ export class Router {
     const matchedRoute = this.#matchRoute(pathname);
     const newRouteContext = this.#createRouteContext(matchedRoute);
 
-    const canEnterRoute =
-      (await matchedRoute.route.beforeEnter?.(newRouteContext)) ?? true;
+    let canEnterRoute: boolean;
+
+    try {
+      canEnterRoute =
+        (await matchedRoute.route.beforeEnter?.(newRouteContext)) ?? true;
+    } catch (error) {
+      if (error instanceof Error) {
+        error.message = "beforeEnter error: " + error.message;
+        this.#renderError(error);
+      }
+      return;
+    }
 
     if (!canEnterRoute) return;
 
@@ -236,7 +250,15 @@ export class Router {
 
     historyAction?.();
 
-    await this.#renderRouteView(Router.#currentRoute.route);
+    try {
+      await this.#renderRouteView(Router.#currentRoute.route);
+    } catch (error) {
+      if (error instanceof Error) {
+        error.message = "Route view render error: " + error.message;
+        this.#renderError(error);
+      }
+    }
+
     this.#callRouteChangeCallbacks();
 
     // scroll the view
@@ -283,10 +305,25 @@ export class Router {
     const { view } = route;
 
     if (!view) {
-      throw new Error(`View for the route ${route.path} is missing.`);
+      this.#renderError(
+        new Error(`View for the route ${route.path} is missing.`)
+      );
     }
 
-    const { viewType, view: viewElement } = await this.#validateView(view);
+    let viewType: "string" | "web-component" | "html-element";
+    let viewElement: ViewTypes;
+
+    try {
+      const validatedView = await this.#validateView(view);
+      viewType = validatedView.viewType;
+      viewElement = validatedView.view;
+    } catch (error) {
+      if (error instanceof Error) {
+        error.message = "Route view render error: " + error.message;
+        this.#renderError(error);
+      }
+      return;
+    }
 
     if (viewType === "string") {
       this.rootElement.replaceChildren();
@@ -336,7 +373,18 @@ export class Router {
     if (typeof view === "function") {
       const viewPromise = view();
       if (viewPromise instanceof Promise) {
-        const resolvedViewPromise = await viewPromise;
+        let resolvedViewPromise: any;
+
+        try {
+          resolvedViewPromise = await viewPromise;
+        } catch (error) {
+          if (error instanceof Error) {
+            error.message =
+              "There was a problem with lazy loading view. " + error.message;
+            this.#renderError(error);
+          }
+        }
+
         if (resolvedViewPromise.default) {
           return this.#validateView(resolvedViewPromise.default);
         }
@@ -344,8 +392,10 @@ export class Router {
       }
     }
     // other type
-    throw new Error(
-      "Unrecognized view format. View should be a string, name of a web component, html element or promise resolving to one of these types."
+    this.#renderError(
+      new Error(
+        "Unrecognized view format. View should be a string, name of a web component, html element or promise resolving to one of these types."
+      )
     );
   }
 
@@ -367,5 +417,35 @@ export class Router {
     const hashValue = hash.startsWith("#") ? hash.slice(1) : hash;
     const element = document.getElementById(hashValue);
     element?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  #setDevFlag(userSetting?: boolean): void {
+    const bundlerSetting =
+      import.meta.env.DEV || import.meta.env.MODE === "development";
+
+    Router.#isDevMode = userSetting ?? bundlerSetting ?? false;
+  }
+
+  #renderError(error: Error): never {
+    if (Router.#isDevMode) {
+      const div = document.createElement("div");
+      div.innerHTML = `
+      <div style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.95); display: flex; align-items: center; justify-content: center;">
+        <div style="margin: auto auto; border: 2px solid red; color: white; max-width: 80%;">
+          <div style="padding: 10px 15px; border-bottom: 1px solid red;">
+            <span style="font-size: 18px">Router Error</span>
+          </div>
+          <div style="padding: 10px 15px">
+            <pre>${error.message}</pre>
+          </div>
+        </div>
+      </div>
+    `;
+      document.body.appendChild(div);
+    } else {
+      console.error("[Router error]", error);
+    }
+
+    throw error;
   }
 }
