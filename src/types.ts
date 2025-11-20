@@ -1,5 +1,5 @@
 export type HtmlStringView = string;
-export type WebComponentView = string;
+export type WebComponentView = `${Lowercase<string>}-${string}`;
 export type HtmlElementView = HTMLElement;
 export type LazyView = () => Promise<any>;
 
@@ -12,7 +12,7 @@ export type ViewTypes =
 export type Route = {
   path: string;
   view: ViewTypes;
-  beforeEnter?: (ctx: RouteContext) => boolean | Promise<boolean>;,
+  beforeEnter?: (ctx: RouteContext) => boolean | Promise<boolean>;
   preserveScrollPosition?: boolean;
   title?: string;
 };
@@ -20,9 +20,9 @@ export type Route = {
 export type RouteContext = {
   url: URL;
   pathname: string;
-  params: Record<string, string> | null;
-  query: Record<string, string> | null;
-  hash: string | null;
+  params: Record<string, string>;
+  query: Record<string, string>;
+  hash: string;
 };
 
 export type MatchResult = {
@@ -30,4 +30,4 @@ export type MatchResult = {
   params: Record<string, string>;
 };
 
-export type OnRouteChangeCallback = (ctx: RouteContext) => void;
+export type OnRouteChangeCallback = (ctx: RouteContext) => void | Promise<void>;
