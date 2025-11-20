@@ -15,6 +15,7 @@ export class Router {
   static #currentRouteContext: RouteContext;
   static #currentRoute: MatchResult;
   static #routeChangeCallbacks: OnRouteChangeCallback[] = [];
+  static #scrollPositions: Map<string, number> = new Map();
 
   constructor(routes: Route[], root: string) {
     this.#singletonGuard();
@@ -31,14 +32,18 @@ export class Router {
 
   navigate(path: string): void {
     const normalizedPath = this.#normalizeUrl(path);
-    history.pushState({}, "", normalizedPath);
-    this.#renderRoute();
+
+    this.#renderRoute(normalizedPath, () =>
+      history.pushState({}, "", normalizedPath)
+    );
   }
 
   redirect(path: string): void {
     const normalizedPath = this.#normalizeUrl(path);
-    history.replaceState({}, "", normalizedPath);
-    this.#renderRoute();
+
+    this.#renderRoute(normalizedPath, () =>
+      history.replaceState({}, "", normalizedPath)
+    );
   }
 
   url(): URL {
@@ -49,14 +54,14 @@ export class Router {
     const { params, query, hash } = Router.#currentRouteContext;
 
     return {
-      pathParams: params,
+      params,
       query,
       hash,
     };
   }
 
-  currentRoute(): Route {
-    return Router.#currentRoute.route;
+  currentRoute(): MatchResult {
+    return Router.#currentRoute;
   }
 
   onRouteChange(cb: OnRouteChangeCallback): () => void {
@@ -107,8 +112,10 @@ export class Router {
   }
 
   #bindEvents(): void {
-    window.addEventListener("popstate", this.#renderRoute.bind(this));
-    document.addEventListener("click", this.#handleLinkClick.bind(this));
+    window.addEventListener("popstate", () => this.#renderRoute());
+    document.addEventListener("click", (e: PointerEvent) =>
+      this.#handleLinkClick(e)
+    );
   }
 
   #handleLinkClick(event: PointerEvent): void {
@@ -133,7 +140,11 @@ export class Router {
 
     if (!href || targetBlank || isDownload || isExternal) return;
     // is anchor link
-    if (href.startsWith("#")) return;
+    if (href.startsWith("#")) {
+      event.preventDefault();
+      this.#scrollToElement(href);
+      return;
+    }
 
     const forbiddenProtocols = [
       "http://",
@@ -147,8 +158,10 @@ export class Router {
       "file:",
       "data:",
     ];
+
+    const loweredHref = href.toLowerCase();
     const hasForbiddenProtocol = forbiddenProtocols.some((protocol) =>
-      href!.toLowerCase().startsWith(protocol)
+      loweredHref.startsWith(protocol)
     );
 
     if (hasForbiddenProtocol) return;
@@ -199,24 +212,45 @@ export class Router {
     return matchRoute;
   }
 
-  async #renderRoute(): Promise<any> {
-    const pathname = window.location.pathname;
-    Router.#currentRoute = this.#matchRoute(pathname);
-    Router.#currentRouteContext = this.#createRouteContext(
-      Router.#currentRoute
-    );
+  async #renderRoute(path?: string, historyAction?: () => void): Promise<any> {
+    const pathname = path
+      ? new URL(path, window.location.origin).pathname
+      : window.location.pathname;
+    const matchedRoute = this.#matchRoute(pathname);
+    const newRouteContext = this.#createRouteContext(matchedRoute);
 
     const canEnterRoute =
-      (await Router.#currentRoute.route.beforeEnter?.(
-        Router.#currentRouteContext
-      )) ?? true;
+      (await matchedRoute.route.beforeEnter?.(newRouteContext)) ?? true;
 
     if (!canEnterRoute) return;
 
+    Router.#currentRoute = matchedRoute;
+    Router.#currentRouteContext = newRouteContext;
+
+    const { pathname: pn, search, hash } = Router.#currentRouteContext.url;
+    const scrollPositionsMapKey = pn + search + hash;
+    // preserve scroll position on the page user is leaving
+    if (Router.#currentRoute.route.preserveScrollPosition) {
+      Router.#scrollPositions.set(scrollPositionsMapKey, window.screenY);
+    }
+
+    historyAction?.();
+
     await this.#renderRouteView(Router.#currentRoute.route);
     this.#callRouteChangeCallbacks();
-    // reset scroll position
-    window.scrollTo(0, 0);
+
+    // scroll the view
+    const lastScrollPosition = Router.#scrollPositions.get(
+      scrollPositionsMapKey
+    );
+
+    if (Router.#currentRouteContext.hash) {
+      this.#scrollToElement(Router.#currentRouteContext.hash);
+    } else if (lastScrollPosition) {
+      window.scrollTo(0, lastScrollPosition);
+    } else {
+      window.scrollTo(0, 0);
+    }
   }
 
   #createRouteContext(matchedRoute: MatchResult): RouteContext {
@@ -265,6 +299,8 @@ export class Router {
     if (viewType === "html-element") {
       this.rootElement.replaceChildren(viewElement as HTMLElement);
     }
+    // set page's title if provided
+    if (route.title) document.title = route.title;
   }
 
   async #validateView(view: ViewTypes): Promise<{
@@ -281,7 +317,7 @@ export class Router {
         };
       }
       // web component
-      const regexp = /^[a-z0-9]+(-[a-z0-9]+)+$/;
+      const regexp = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
       if (regexp.test(trimmed)) {
         return {
           viewType: "web-component",
@@ -325,5 +361,11 @@ export class Router {
         console.error("RouteChange callback error: ", error);
       }
     });
+  }
+
+  #scrollToElement(hash: string): void {
+    const hashValue = hash.startsWith("#") ? hash.slice(1) : hash;
+    const element = document.getElementById(hashValue);
+    element?.scrollIntoView({ behavior: "smooth" });
   }
 }

@@ -12,7 +12,9 @@ export type ViewTypes =
 export type Route = {
   path: string;
   view: ViewTypes;
-  beforeEnter?: (ctx: RouteContext) => boolean | Promise<boolean>;
+  beforeEnter?: (ctx: RouteContext) => boolean | Promise<boolean>;,
+  preserveScrollPosition?: boolean;
+  title?: string;
 };
 
 export type RouteContext = {
