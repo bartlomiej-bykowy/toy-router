@@ -5,6 +5,12 @@ import type {
   RouteContext,
   ViewTypes,
 } from "./types";
+import {
+  loadRoutes,
+  matchRoute,
+  normalizeUrl,
+  scrollToElement,
+} from "./utils/";
 
 export class Router {
   routes: Route[];
@@ -18,11 +24,14 @@ export class Router {
   static #scrollPositions: Map<string, number> = new Map();
   static #isDevMode: boolean;
 
+  static #clickCallback: any;
+  static #popstateCallback: any;
+
   constructor(routes: Route[], root: string, devMode?: boolean) {
     this.#setDevFlag(devMode);
     this.#singletonGuard();
 
-    this.routes = this.#loadRoutes(routes);
+    this.routes = loadRoutes(routes);
     this.root = root;
     this.rootElement = this.#setRootElement();
 
@@ -33,7 +42,7 @@ export class Router {
   // ------------- PUBLIC METHODS ------------- //
 
   navigate(path: string): void {
-    const normalizedPath = this.#normalizeUrl(path);
+    const normalizedPath = normalizeUrl(path);
 
     this.#renderRoute(normalizedPath, () =>
       history.pushState({}, "", normalizedPath)
@@ -41,7 +50,7 @@ export class Router {
   }
 
   redirect(path: string): void {
-    const normalizedPath = this.#normalizeUrl(path);
+    const normalizedPath = normalizeUrl(path);
 
     this.#renderRoute(normalizedPath, () =>
       history.replaceState({}, "", normalizedPath)
@@ -93,18 +102,6 @@ export class Router {
     }
   }
 
-  #loadRoutes(routes: Route[]): Route[] {
-    const isCatchAllRoute = routes.find((route) => route.path === "*");
-    if (isCatchAllRoute) return routes;
-
-    const catchAllRoute: Route = {
-      path: "*",
-      view: "<h1>404 Page Not Foud</h1>",
-    };
-
-    return [...routes, catchAllRoute];
-  }
-
   #setRootElement(): HTMLElement {
     const el = document.querySelector(this.root) as HTMLElement;
 
@@ -116,16 +113,18 @@ export class Router {
   }
 
   #bindEvents(): void {
-    window.addEventListener("popstate", () => this.#renderRoute());
-    document.addEventListener("click", (e: PointerEvent) =>
-      this.#handleLinkClick(e)
-    );
+    Router.#popstateCallback = () => this.#renderRoute();
+    Router.#clickCallback = (e: PointerEvent) => this.#handleLinkClick(e);
+
+    window.addEventListener("popstate", Router.#popstateCallback);
+    document.addEventListener("click", Router.#clickCallback);
   }
 
   #handleLinkClick(event: PointerEvent): void {
     // ignore if click with modifier
     const { defaultPrevented, metaKey, ctrlKey, shiftKey, altKey, button } =
       event;
+
     if (defaultPrevented) return;
     if (metaKey || ctrlKey || shiftKey || altKey) return;
     // not left button
@@ -146,7 +145,7 @@ export class Router {
     // is anchor link
     if (href.startsWith("#")) {
       event.preventDefault();
-      this.#scrollToElement(href);
+      scrollToElement(href);
       return;
     }
 
@@ -170,58 +169,22 @@ export class Router {
 
     if (hasForbiddenProtocol) return;
 
-    href = this.#normalizeUrl(href);
+    href = normalizeUrl(href);
 
     // prevent default if all criteria are met
     event.preventDefault();
     this.navigate(href);
   }
 
-  #matchRoute(pathname: string): MatchResult {
-    const regexp = /^\/|\/$/g;
-    const pathArr = pathname.replace(regexp, "").split("/");
-
-    let matchRoute: MatchResult = {
-      route: this.routes.find((route) => route.path === "*")!,
-      params: {},
-    };
-
-    for (const route of this.routes) {
-      const routeArr = route.path.replace(regexp, "").split("/");
-
-      if (routeArr.length === pathArr.length) {
-        let params: MatchResult["params"] = {};
-        let routeFound = true;
-
-        for (const idx in routeArr) {
-          const routeSegment = routeArr[idx];
-          const pathSegment = pathArr[idx];
-
-          if (routeSegment.startsWith(":")) {
-            params[routeSegment.slice(1)] = pathSegment;
-          } else if (routeSegment !== pathSegment) {
-            routeFound = false;
-            break;
-          }
-        }
-
-        if (routeFound) {
-          matchRoute.route = route;
-          matchRoute.params = params;
-          break;
-        }
-      }
-    }
-
-    return matchRoute;
-  }
-
   async #renderRoute(path?: string, historyAction?: () => void): Promise<any> {
     const pathname = path
       ? new URL(path, window.location.origin).pathname
       : window.location.pathname;
-    const matchedRoute = this.#matchRoute(pathname);
-    const newRouteContext = this.#createRouteContext(matchedRoute);
+    const matchedRoute = matchRoute(pathname, this.routes);
+    const newRouteContext = this.#createRouteContext(
+      matchedRoute,
+      path || pathname
+    );
 
     let canEnterRoute: boolean;
 
@@ -245,7 +208,7 @@ export class Router {
     const scrollPositionsMapKey = pn + search + hash;
     // preserve scroll position on the page user is leaving
     if (Router.#currentRoute.route.preserveScrollPosition) {
-      Router.#scrollPositions.set(scrollPositionsMapKey, window.screenY);
+      Router.#scrollPositions.set(scrollPositionsMapKey, window.scrollY);
     }
 
     historyAction?.();
@@ -267,16 +230,16 @@ export class Router {
     );
 
     if (Router.#currentRouteContext.hash) {
-      this.#scrollToElement(Router.#currentRouteContext.hash);
-    } else if (lastScrollPosition) {
+      scrollToElement(Router.#currentRouteContext.hash);
+    } else if (lastScrollPosition !== undefined) {
       window.scrollTo(0, lastScrollPosition);
     } else {
       window.scrollTo(0, 0);
     }
   }
 
-  #createRouteContext(matchedRoute: MatchResult): RouteContext {
-    const url = new URL(window.location.href);
+  #createRouteContext(matchedRoute: MatchResult, path: string): RouteContext {
+    const url = new URL(path, window.location.origin);
     const { pathname, search, hash } = url;
     const query = search.replace("?", "");
     // turn ?id=1&sort=asc into {id: 1, sort: "asc"}
@@ -399,10 +362,6 @@ export class Router {
     );
   }
 
-  #normalizeUrl(url: string): string {
-    return url.startsWith("/") ? url : "/" + url;
-  }
-
   #callRouteChangeCallbacks(): void {
     Router.#routeChangeCallbacks.forEach((callback) => {
       try {
@@ -411,12 +370,6 @@ export class Router {
         console.error("RouteChange callback error: ", error);
       }
     });
-  }
-
-  #scrollToElement(hash: string): void {
-    const hashValue = hash.startsWith("#") ? hash.slice(1) : hash;
-    const element = document.getElementById(hashValue);
-    element?.scrollIntoView({ behavior: "smooth" });
   }
 
   #setDevFlag(userSetting?: boolean): void {
@@ -447,5 +400,24 @@ export class Router {
     }
 
     throw error;
+  }
+
+  static __resetForTests() {
+    if (Router.#popstateCallback) {
+      window.removeEventListener("popstate", Router.#popstateCallback);
+      Router.#popstateCallback = undefined;
+    }
+
+    if (Router.#clickCallback) {
+      document.removeEventListener("click", Router.#clickCallback);
+      Router.#clickCallback = undefined;
+    }
+
+    Router.#routerInstances = 0;
+    Router.#currentRouteContext = undefined as any;
+    Router.#currentRoute = undefined as any;
+    Router.#routeChangeCallbacks = [];
+    Router.#scrollPositions = new Map();
+    Router.#isDevMode = undefined as any;
   }
 }
