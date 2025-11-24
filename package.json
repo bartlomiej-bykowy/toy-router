@@ -2,20 +2,39 @@
   "name": "@bartlomiej-bykowy/toy-router",
   "version": "1.0.0",
   "description": "A tiny vanilla JS router for SPA apps",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "module": "dist/index.js",
+  "types": "dist/index.d.ts",
   "type": "module",
   "files": [
     "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest"
+    "build": "tsup",
+    "test": "vitest --run",
+    "test-watch": "vitest",
+    "format:write": "prettier --write \"src/**/*.{ts,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,md}\"",
+    "lint": "eslint ."
   },
   "devDependencies": {
-    "happy-dom": "^20.0.10",
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "jiti": "^2.6.1",
     "jsdom": "^27.2.0",
+    "prettier": "3.6.2",
+    "tsup": "^8.5.1",
     "typescript": "~5.9.3",
+    "typescript-eslint": "^8.48.0",
     "vite": "^7.2.2",
     "vitest": "^4.0.12"
   },

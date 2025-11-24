@@ -4,7 +4,7 @@ export function matchRoute(pathname: string, routes: Route[]): MatchResult {
   const regexp = /^\/|\/$/g;
   const pathArr = pathname.replace(regexp, "").split("/");
 
-  let matchRoute: MatchResult = {
+  const matchRoute: MatchResult = {
     route: routes.find((route) => route.path === "*")!,
     params: {},
   };
@@ -13,7 +13,7 @@ export function matchRoute(pathname: string, routes: Route[]): MatchResult {
     const routeArr = route.path.replace(regexp, "").split("/");
 
     if (routeArr.length === pathArr.length) {
-      let params: MatchResult["params"] = {};
+      const params: MatchResult["params"] = {};
       let routeFound = true;
 
       for (const idx in routeArr) {
