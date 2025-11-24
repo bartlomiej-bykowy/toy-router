@@ -9,11 +9,15 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "test": "vitest"
   },
   "devDependencies": {
+    "happy-dom": "^20.0.10",
+    "jsdom": "^27.2.0",
     "typescript": "~5.9.3",
-    "vite": "^7.2.2"
+    "vite": "^7.2.2",
+    "vitest": "^4.0.12"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com/"
