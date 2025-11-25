@@ -28,13 +28,14 @@ To see it in action you can use [this](https://github.com/bartlomiej-bykowy/toy-
 
 ## 📦 Installation
 
-This package is published to GitHub Packages.
+Install the router from npm:
 
-Your project must include an .npmrc file:
-
-```
-@bartlomiej-bykowy:registry=https://npm.pkg.github.com
-//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
+```sh
+npm install @bartlomiej-bykowy/toy-router
+# or
+pnpm add @bartlomiej-bykowy/toy-router
+# or
+yarn add @bartlomiej-bykowy/toy-router
 ```
 
 then install:
