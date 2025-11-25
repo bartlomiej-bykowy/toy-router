@@ -31,6 +31,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Replace README for npm
+        run: cp README.npm.md README.md
+
       - name: Build
         run: pnpm build
 

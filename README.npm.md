@@ -1,5 +1,11 @@
 # toy-router
 
+---
+
+## ⚠️ This package was created as a side/hobby project and it's not meant to be used in production.
+
+---
+
 _toy-router_ is a small, dependency-free client-side router for building simple SPA-style navigation in plain JavaScript.
 It was created to demonstrate how routing works under the hood and how to build a minimal framework-agnostic navigation system.
 To see it in action you can use [this](https://github.com/bartlomiej-bykowy/toy-shop) simple demo app.

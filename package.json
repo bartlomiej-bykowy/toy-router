@@ -1,6 +1,6 @@
 {
   "name": "@bartlomiej-bykowy/toy-router",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A tiny vanilla JS router for SPA apps",
   "main": "dist/index.cjs",
   "module": "dist/index.js",
