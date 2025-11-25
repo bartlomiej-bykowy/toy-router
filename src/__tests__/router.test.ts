@@ -23,7 +23,7 @@ async function setup(
 const routes = [
   { path: "/", view: "<h1>Home</h1>" },
   { path: "/page-2", view: "<h1>Page 2</h1>" },
-  { path: "/user/:id", view: "<h1>User</h1>" },
+  { path: "/user/:id", view: "<h1>User</h1>" }
 ];
 
 describe("JS Router", () => {
@@ -94,13 +94,13 @@ describe("JS Router", () => {
       const guardedRoutes = [
         {
           path: "/",
-          view: "<h1>Home</h1>",
+          view: "<h1>Home</h1>"
         },
         {
           path: "/secret",
           view: "<h1>Secret</h1>",
-          beforeEnter: () => false,
-        },
+          beforeEnter: () => false
+        }
       ];
 
       const { root, router } = await setup(guardedRoutes);
@@ -117,7 +117,7 @@ describe("JS Router", () => {
       const guardedRoutes = [
         {
           path: "/",
-          view: "<h1>Home</h1>",
+          view: "<h1>Home</h1>"
         },
         {
           path: "/private",
@@ -125,8 +125,8 @@ describe("JS Router", () => {
           beforeEnter: async () => {
             await new Promise((r) => setTimeout(r, 10));
             return true;
-          },
-        },
+          }
+        }
       ];
 
       const { root, router } = await setup(guardedRoutes);
@@ -223,9 +223,9 @@ describe("JS Router", () => {
         {
           path: "/",
           view: async () => ({
-            default: "<h1>Lazy</h1>",
-          }),
-        },
+            default: "<h1>Lazy</h1>"
+          })
+        }
       ];
 
       const { root } = await setup(routes);
@@ -297,7 +297,7 @@ describe("JS Router", () => {
         Object.defineProperty(window, prop, {
           value: 0,
           writable: true,
-          configurable: true,
+          configurable: true
         })
       );
       Object.defineProperty(window, "scrollTo", {
@@ -306,16 +306,16 @@ describe("JS Router", () => {
           window.scrollY = y;
         },
         writable: true,
-        configurable: true,
+        configurable: true
       });
 
       const routes = [
         {
           path: "/",
           view: "<h1>Home</h1>",
-          preserveScrollPosition: true,
+          preserveScrollPosition: true
         },
-        { path: "/page-2", view: "<h1>Page 2</h1>" },
+        { path: "/page-2", view: "<h1>Page 2</h1>" }
       ];
 
       const { root, router } = await setup(routes);

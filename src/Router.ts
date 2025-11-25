@@ -3,13 +3,13 @@ import type {
   OnRouteChangeCallback,
   Route,
   RouteContext,
-  ViewTypes,
+  ViewTypes
 } from "./types";
 import {
   loadRoutes,
   matchRoute,
   normalizeUrl,
-  scrollToElement,
+  scrollToElement
 } from "./utils/";
 
 export class Router {
@@ -67,7 +67,7 @@ export class Router {
     return {
       params,
       query,
-      hash,
+      hash
     };
   }
 
@@ -159,7 +159,7 @@ export class Router {
       "javascript:",
       "blob:",
       "file:",
-      "data:",
+      "data:"
     ];
 
     const loweredHref = href.toLowerCase();
@@ -258,7 +258,7 @@ export class Router {
       pathname,
       params: matchedRoute.params,
       query: queryObj,
-      hash: hash.replace("#", ""),
+      hash: hash.replace("#", "")
     };
 
     return routeContext;
@@ -313,7 +313,7 @@ export class Router {
       if (trimmed.startsWith("<") && trimmed.endsWith(">")) {
         return {
           viewType: "string",
-          view: trimmed,
+          view: trimmed
         };
       }
       // web component
@@ -321,7 +321,7 @@ export class Router {
       if (regexp.test(trimmed)) {
         return {
           viewType: "web-component",
-          view: trimmed,
+          view: trimmed
         };
       }
     }
@@ -329,7 +329,7 @@ export class Router {
     if (view instanceof HTMLElement) {
       return {
         viewType: "html-element",
-        view,
+        view
       };
     }
     // lazy loaded element

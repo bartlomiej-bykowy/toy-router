@@ -6,7 +6,7 @@ export function matchRoute(pathname: string, routes: Route[]): MatchResult {
 
   const matchRoute: MatchResult = {
     route: routes.find((route) => route.path === "*")!,
-    params: {},
+    params: {}
   };
 
   for (const route of routes) {
